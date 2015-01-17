@@ -1,14 +1,15 @@
-================================================
-ZenPacks.JanGaraj.DataMirroring (beta) - code it
-================================================
+===============================
+ZenPacks.JanGaraj.DataMirroring
+===============================
 
 About
 =====
 
 This ZenPack is not standard Zenpack Install&Use. It provides only example code to mirror Zenoss data into another (monitoring) systems. 
-It's monkey patch for Products.ZenRRD.RRDUtil.RRDUtil.save() method, so you have to be 100% sure about your ZenPack code. 
+It's monkey patch for Products.ZenRRD.RRDUtil.RRDUtil.put() method, so you have to be 100% sure about your ZenPack code. 
 Mirror tasks are executed in new threads and they don't block Zenoss RRDUtil code. It depends on your requirements, but 
-probably you will need to implement some performance improvements (persistent connections/connection pool/...) for serious production service.
+probably you will need to implement some performance improvements (persistent connections/connection pool/...) for serious production service. Keep in mind also concurrency and timeouts problems in your code.
+
 Example codes are provided for mirroring to:
 
 - Carbon (Graphite)/Dataloop/InfluxDB
@@ -23,7 +24,7 @@ Use case
 ========
 
 You want to test some cool feature (graphing/anomaly detection/analyzing/reporting/alerting) of another system, but you don't want to make full installation.
-So you can mirror current data from Zenoss to another system and you can test it.   
+You can realtime mirror current data from Zenoss to another system and you can test it.   
                                 
 Requirements
 ============
@@ -46,7 +47,7 @@ Copy this file to your Zenoss server and run the following commands as the zenos
 user.
 
 ```
-zenpack --install ZenPacks.JanGaraj.DataMirroring-0.0.1.egg
+zenpack --install ZenPacks.JanGaraj.DataMirroring-1.0.0.egg
 zenoss restart
 ```
         

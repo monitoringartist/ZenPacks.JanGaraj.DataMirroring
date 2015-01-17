@@ -1,9 +1,27 @@
-# This code goes into the __init__.py of a ZenPack. It patches the
-# Products.ZenRRD.RRDUtil.RRDUtil.save() method. This allows for
-# executing custom code for every RRD update that's made.
-# When you change a code, then: zenprocess restart
-# Stadard log file: /opt/zenoss/log/zenprocess.log
-# patch save(), because put() is not used in Zenoss 4.1.1
+'''
+ ** __init__.py - Monkey Patch for Products.ZenRRD.RRDUtil.RRDUtil
+ ** Copyright (C) 2015 Jan Garaj - www.jangaraj.com
+ **
+ ** This code goes into the __init__.py of a ZenPack. It patches the
+ ** Products.ZenRRD.RRDUtil.RRDUtil.put() method. This allows 
+ ** executing custom code for every RRD update that's made.
+ ** When you change a code, then zenprocess restart is required.
+ ** Logs are stored in standard zenprocess log: /opt/zenoss/log/zenprocess.log    
+ **
+ ** This program is free software; you can redistribute it and/or modify
+ ** it under the terms of the GNU General Public License as published by
+ ** the Free Software Foundation; either version 2 of the License, or
+ ** (at your option) any later version.
+ **
+ ** This program is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ ** GNU General Public License for more details.
+ **
+ ** You should have received a copy of the GNU General Public License
+ ** along with this program; if not, write to the Free Software
+ ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.     
+'''
 
 from Products.ZenUtils.Utils import monkeypatch, rrd_daemon_running
 import thread, threading, time, logging
@@ -11,9 +29,9 @@ from time import gmtime, strftime
 log = logging.getLogger("zen.RRDUtil")
 
 @monkeypatch('Products.ZenRRD.RRDUtil.RRDUtil')
-def save(self, path, value, rrdType, rrdCommand=None, cycleTime=None,
+def put(self, path, value, rrdType, rrdCommand=None, cycleTime=None,
          min='U', max='U', useRRDDaemon=True, timestamp='N', start=None,
-         allowStaleDatapoint=True):
+         allowStaleDatapoint=True):         
     """
     Save the value provided in the command to the RRD file specified in path.
 
@@ -34,6 +52,8 @@ def save(self, path, value, rrdType, rrdCommand=None, cycleTime=None,
     @type min: number
     @param max: maximum value acceptable for this metric
     @type max: number
+    @param allowStaleDatapoint: attempt to write datapoint even if a newer datapoint has already been written
+    @type allowStaleDatapoint: boolean
     @return: the parameter value converted to a number
     @rtype: number or None
     """
@@ -41,40 +61,19 @@ def save(self, path, value, rrdType, rrdCommand=None, cycleTime=None,
     # run mirror task in separated thread, so it won't block RRD update
     thread = threading.Thread(target=self.mirror, args=(path, value))
     thread.start()
+    # imports and inits required for put() method
+    import os
+    import re
+    import rrdtool
+    import string    
+    from Products.ZenUtils.Utils import zenPath, rrd_daemon_args, rrd_daemon_retry
+    EMPTY_RRD = zenPath('perf', 'empty.rrd')    
+    _UNWANTED_CHARS = ''.join(
+            set(string.punctuation + string.ascii_letters) - set(['.', '-', '+', 'e'])
+        )
+    _LAST_RRDFILE_WRITE = {}
 
-    # original save() code - Zenoss 4.2.5
-    value = self.put(path, value, rrdType, rrdCommand, cycleTime, min, max, useRRDDaemon, timestamp, start, allowStaleDatapoint)
-
-    if value is None:
-        return None
-
-    if rrdType in ('COUNTER', 'DERIVE'):
-        filename = self.performancePath(path) + '.rrd'
-        if cycleTime is None:
-            cycleTime = self.defaultCycleTime
-
-        @rrd_daemon_retry
-        def rrdtool_fn():
-            daemon_args = rrd_daemon_args() if useRRDDaemon else tuple()
-            return rrdtool.fetch(filename, 'AVERAGE',
-                                '-s', 'now-%d' % (cycleTime*2),
-                                '-e', 'now', *daemon_args)
-        startStop, names, values = rrdtool_fn()
-
-        values = [ v[0] for v in values if v[0] is not None ]
-        if values: value = values[-1]
-        else: value = None
-    return value
-
-    # original save() code - Zenoss 4.1.1
-    """
-    import rrdtool, os
-    daemon_args = ()
-    if useRRDDaemon:
-        daemon = rrd_daemon_running()
-        if daemon:
-            daemon_args = ('--daemon', daemon)
-
+    # rest of original put() code - Zenoss 4.2.5
     if value is None: return None
 
     self.dataPoints += 1
@@ -95,13 +94,27 @@ def save(self, path, value, rrdType, rrdCommand=None, cycleTime=None,
         min, max = map(_checkUndefined, (min, max))
         dataSource = 'DS:%s:%s:%d:%s:%s' % (
             'ds0', rrdType, self.getHeartbeat(cycleTime), min, max)
-        rrdtool.create(str(filename), "--step",
-            str(self.getStep(cycleTime)),
-            str(dataSource), *rrdCommand.split())
+        args = [str(filename), "--step",
+            str(self.getStep(cycleTime)),]
+        if start is not None:
+            args.extend(["--start", "%d" % start])
+        elif timestamp != 'N':
+            args.extend(["--start", str(int(timestamp) - 10)])
+
+        args.append(str(dataSource))
+        args.extend(rrdCommand.split())
+        rrdtool.create(*args),
+
+    daemon_args = rrd_daemon_args() if useRRDDaemon else tuple()
+
+    # remove unwanted chars (this is actually pretty quick)
+    value = str(value).translate(None, _UNWANTED_CHARS)
 
     if rrdType in ('COUNTER', 'DERIVE'):
         try:
-            value = long(value)
+            # cast to float first because long('100.0') will fail with a
+            # ValueError
+            value = long(float(value))
         except (TypeError, ValueError):
             return None
     else:
@@ -110,22 +123,38 @@ def save(self, path, value, rrdType, rrdCommand=None, cycleTime=None,
         except (TypeError, ValueError):
             return None
     try:
-        rrdtool.update(str(filename), *(daemon_args + ('%s:%s' % (timestamp, value),)))
-        log.debug('%s: %r', str(filename), value)
+        @rrd_daemon_retry
+        def rrdtool_fn():
+            return rrdtool.update(str(filename), *(daemon_args + ('%s:%s' % (timestamp, value),)))
+        if timestamp == 'N' or allowStaleDatapoint:
+            rrdtool_fn()
+        else:
+            # try to detect when the last datasample was collected
+            lastTs = _LAST_RRDFILE_WRITE.get(filename, None)
+            if lastTs is None:
+                try:
+                    lastTs = _LAST_RRDFILE_WRITE[filename] = rrdtool.last(
+                        *(daemon_args + (str(filename),)))
+                except Exception as ex:
+                     lastTs = 0
+                     log.exception("Could not determine last update to %r", filename)
+            # if the current datapoint is newer than the last datapoint, then write
+            if lastTs < timestamp:
+                _LAST_RRDFILE_WRITE[filename] = timestamp
+                if log.getEffectiveLevel() < logging.DEBUG:
+                    log.debug('%s: %r, currentTs = %s, lastTs = %s', filename, value, timestamp, lastTs)
+                rrdtool_fn()
+            else:
+                if log.getEffectiveLevel() < logging.DEBUG:
+                    log.debug("ignoring write %s:%s", filename, timestamp)
+                return None
+
+        log.debug('%s: %r, @ %s', str(filename), value, timestamp)
     except rrdtool.error, err:
         # may get update errors when updating too quickly
         log.error('rrdtool reported error %s %s', err, path)
 
-    if rrdType in ('COUNTER', 'DERIVE'):
-        startStop, names, values = \
-            rrdtool.fetch(filename, 'AVERAGE',
-                '-s', 'now-%d' % (cycleTime*2),
-                '-e', 'now', *daemon_args)
-        values = [ v[0] for v in values if v[0] is not None ]
-        if values: value = values[-1]
-        else: value = None
     return value
-    """
 
 @monkeypatch('Products.ZenRRD.RRDUtil.RRDUtil')
 def mirror(self, *args):
@@ -133,7 +162,7 @@ def mirror(self, *args):
     # ('Devices/localhost/laLoadInt1_laLoadInt1', 3)
     # TODO implement thread execution timeout
 
-    log.info('Thread %s starting %s' % (thread.get_ident(), args))
+    log.info('Mirroring thread %s starting %s' % (thread.get_ident(), args))
 
     start_time = time.time()
     datetime = strftime("%Y-%m-%d %H:%M:%S", gmtime())
@@ -142,7 +171,7 @@ def mirror(self, *args):
     metric = '.'.join(args[0].replace('Devices/', '').split('/')[1:])
     log.info('Mirroring - host: %s, metric: %s, value: %s' % (host, metric, args[1]))
 
-    '''
+    '''    
     # insert data into file
     mirrorFile = "/tmp/zenoss_mirrored_data.txt"
     log.debug("Mirroring data into file %s", mirrorFile)
@@ -151,7 +180,7 @@ def mirror(self, *args):
         text_file.write("%s\t%s\t%s\t%s\n" % (datetime, host, metric, args[1]))
         text_file.close()
     except Exception, e:
-        log.error("Mirroring data into file: %s - exception: %s", mirrorFile, e)
+        log.error("Mirroring data into file: %s - exception: %s", mirrorFile, e)    
 
     # insert data into MySQL/MariaDB - www.mysql.com/www.mariadb.org
     database = 'zenoss'
@@ -281,4 +310,4 @@ def mirror(self, *args):
         log.error('Error while sending data to collectd: ' + str(e))
     '''
 
-    log.info('Thread %s finishig in %s sec' % (thread.get_ident(), str(time.time() - start_time)))
+    log.info('Mirroring thread %s finished in %s sec' % (thread.get_ident(), str(time.time() - start_time)))
