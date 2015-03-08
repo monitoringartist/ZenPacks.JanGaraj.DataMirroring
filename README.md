@@ -1,4 +1,3 @@
-===============================
 ZenPacks.JanGaraj.DataMirroring
 ===============================
 
@@ -70,4 +69,8 @@ Thanks
 
 - [Zenoss](http://www.zenoss.com/) - send your appreciation to Zenoss guys via Andrew D Kirch AKA trelane (Zenoss community manager) 
 - Cluther - thanks for snippet https://gist.github.com/cluther/4ba4debaab5bdb72147d
-- [Jan Garaj](http://www.jangaraj.com/) - endorse me for Zenoss/Zabbix skill on [Jan Garaj LinkedIn](https://www.linkedin.com/in/jangaraj)
+
+Author
+======
+ 
+[Devops Monitoring zExpert](http://www.jangaraj.com), who loves monitoring systems, which start with letter Z. Those are Zabbix and Zenoss. [LinkedIn] (http://uk.linkedin.com/in/jangaraj/).
