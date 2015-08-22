@@ -4,10 +4,20 @@ ZenPacks.JanGaraj.DataMirroring
 About
 =====
 
-This ZenPack is not standard Zenpack Install&Use. It provides only example code to mirror Zenoss data into another (monitoring) systems. 
-It's monkey patch for Products.ZenRRD.RRDUtil.RRDUtil.put() method, so you have to be 100% sure about your ZenPack code. 
-Mirror tasks are executed in new threads and they don't block Zenoss RRDUtil code. It depends on your requirements, but 
-probably you will need to implement some performance improvements (persistent connections/connection pool/...) for serious production service. Keep in mind also concurrency and timeouts problems in your code.
+This ZenPack is not standard Zenpack Install&Use. It provides only example code 
+to mirror Zenoss data into another (monitoring) systems. It's monkey patch for 
+Products.ZenRRD.RRDUtil.RRDUtil.put() method, so you have to be 100% sure about 
+your ZenPack code. Mirror tasks are executed in new threads and they don't block 
+Zenoss RRDUtil code. It depends on your requirements, but probably you will need 
+to implement some performance improvements (persistent connections/connection 
+pool/...) for serious production service. Keep in mind also concurrency and 
+timeouts problems in your code.
+
+Please donate to author, so he can continue to publish other awesome projects 
+for free:
+
+[![Paypal donate button](http://jangaraj.com/img/github-donate-button02.png)]
+(https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=8LB6J222WRUZ4)
 
 Example codes are provided for mirroring to:
 
@@ -22,8 +32,9 @@ Example codes are provided for mirroring to:
 Use case
 ========
 
-You want to test some cool feature (graphing/anomaly detection/analyzing/reporting/alerting) of another system, but you don't want to make full installation.
-You can realtime mirror current data from Zenoss to another system and you can test it.   
+You want to test some cool feature (graphing/anomaly detection/analyzing/reporting/alerting) 
+of another system, but you don't want to make full installation. You can realtime 
+mirror current data from Zenoss to another system and you can test it.   
                                 
 Requirements
 ============
@@ -55,22 +66,23 @@ Developer Installation (link mode)
 ----------------------------------
 
 If you wish to further develop and possibly contribute back to the DataMirroring
-ZenPack you should clone the [git repository](https://github.com/jangaraj/ZenPacks.JanGaraj.DataMirroring.git),
-then install the ZenPack in developer mode using the following commands.
+ZenPack you should clone the [git repository]
+(https://github.com/monitoringartist/ZenPacks.JanGaraj.DataMirroring.git), then install 
+the ZenPack in developer mode using the following commands.
 
 ```
-git clone git://github.com/jangaraj/ZenPacks.JanGaraj.DataMirroring.git
+git clone git://github.com/monitoringartist/ZenPacks.JanGaraj.DataMirroring.git
 zenpack --link --install ZenPacks.JanGaraj.DataMirroring
 zenoss restart
 ```  
 
-Thanks
-======
-
-- [Zenoss](http://www.zenoss.com/) - send your appreciation to Zenoss guys via Andrew D Kirch AKA trelane (Zenoss community manager) 
-- Cluther - thanks for snippet https://gist.github.com/cluther/4ba4debaab5bdb72147d
-
 Author
 ======
- 
-[Devops Monitoring zExpert](http://www.jangaraj.com), who loves monitoring systems, which start with letter Z. Those are Zabbix and Zenoss. [LinkedIn] (http://uk.linkedin.com/in/jangaraj/).
+
+[Devops Monitoring zExpert](http://www.jangaraj.com), who loves monitoring 
+systems, which start with letter Z. Those are Zabbix and Zenoss.
+
+Professional monitoring services:
+
+[![Monitoring Artist](http://monitoringartist.com/img/github-monitoring-artist-logo.jpg)]
+(http://www.monitoringartist.com)
